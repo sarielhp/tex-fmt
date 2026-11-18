@@ -44,8 +44,10 @@ upstream changes to the sections above merge cleanly.
 - Build, test and install into `~/bin/tex-fmt` with `tools/install`.
   The version string is the upstream version plus `+patched`.
 - Sync with upstream by fetching the `upstream` remote
-  (WGUNDERWOOD/tex-fmt) and rebasing or merging `patched` onto
-  `upstream/main`. Expect conflicts mainly in `src/indent.rs`,
+  (WGUNDERWOOD/tex-fmt) and merging `upstream/main` into `patched`.
+  Never rebase or otherwise rewrite `patched`: it is checked out on
+  several hosts and kept in step by `sync_all`, whose pulls fail on
+  rewritten history. Expect conflicts mainly in `src/indent.rs`,
   `src/format.rs` and `src/wrap.rs`.
 - Branch each upstream contribution from `upstream/main` (upstream pull
   requests target `main`), never from `patched`, keep it to one focused
@@ -80,6 +82,8 @@ Log:
 Candidates for later pull requests, if #163 is well received (one each):
 `\verb` with any delimiter; table fixes (verbatim and `tex-fmt: off`
 regions, blank lines, `\&`; char alignment is already upstream #146);
-atomic writes; `--args` fail-on-change; the `(:?` regex typo. Review
+atomic writes; `--args` fail-on-change; the `(:?` regex typo; `\begin`
+and `\end` ignored for indentation on lines with `\verb` (a negative
+indent after `\begin{center} \verb|x|`). Review
 findings for open upstream pull requests #151, #153, #155 and #156 could
 be posted as comments there.
