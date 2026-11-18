@@ -41,6 +41,11 @@ https://mit-license.org/)
 >   [#156](https://github.com/WGUNDERWOOD/tex-fmt/pull/156),
 >   [#153](https://github.com/WGUNDERWOOD/tex-fmt/pull/153) and
 >   [#155](https://github.com/WGUNDERWOOD/tex-fmt/pull/155).
+> - Fixes found in code review: files are written atomically, so a failed
+>   write cannot cut a file short; `\verb` with any delimiter is never split
+>   or wrapped; `--format-tables` leaves verbatim and `tex-fmt: off`
+>   regions alone and aligns accented text; no overflow past 127 indent
+>   levels; config errors name the file.
 > - New options `indent-delims`, `soft-delims` and `command-blocks` (see
 >   [Configuration](#configuration)).
 
