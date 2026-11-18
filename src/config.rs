@@ -6,7 +6,7 @@ use log::LevelFilter;
 use std::env::current_dir;
 use std::fs::{metadata, read_to_string};
 use std::path::PathBuf;
-use toml::Table;
+use toml::{Table, Value};
 
 /// Config file name
 const CONFIG: &str = "tex-fmt.toml";
@@ -159,6 +159,47 @@ fn string_to_char(name: &str, s: &str) -> Result<char, String> {
     Ok(c)
 }
 
+/// Parse `command-blocks`: an array of blocks, each an array of command
+/// names (opening, middle and closing), with or without a backslash
+fn parse_command_blocks(v: &Value) -> Result<Vec<Vec<String>>, String> {
+    let name = "command-blocks";
+    let shape = || {
+        format!(
+            "{name}: expected an array of arrays of command names, \
+             such as [[\"If\", \"Else\", \"EndIf\"]]"
+        )
+    };
+    v.as_array()
+        .ok_or_else(shape)?
+        .iter()
+        .map(|block| {
+            let names = block
+                .as_array()
+                .ok_or_else(shape)?
+                .iter()
+                .map(|e| {
+                    let s = e.as_str().ok_or_else(shape)?;
+                    let s = s.strip_prefix('\\').unwrap_or(s);
+                    if s.is_empty()
+                        || !s.chars().all(|c| c.is_ascii_alphabetic())
+                    {
+                        return Err(format!(
+                            "{name}: {s:?} is not a command name"
+                        ));
+                    }
+                    Ok(s.to_owned())
+                })
+                .collect::<Result<Vec<String>, String>>()?;
+            if names.len() < 2 {
+                return Err(format!(
+                    "{name}: each block needs an opening and a closing command"
+                ));
+            }
+            Ok(names)
+        })
+        .collect()
+}
+
 /// Parse arguments from a config file path
 ///
 /// # Errors
@@ -218,6 +259,11 @@ pub fn get_config_args(
             .map(Some)
     };
 
+    let command_blocks = config
+        .get("command-blocks")
+        .map(parse_command_blocks)
+        .transpose()?;
+
     let args = OptionArgs {
         check: expect_bool(&config, "check")?,
         print: expect_bool(&config, "print")?,
@@ -236,6 +282,7 @@ pub fn get_config_args(
         wrap_chars,
         indent_delims: char_array("indent-delims")?,
         soft_delims: char_array("soft-delims")?,
+        command_blocks,
         verbosity,
         arguments: None,
         files: vec![],

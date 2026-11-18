@@ -49,6 +49,9 @@ pub struct Args {
     pub indent_delims: Vec<char>,
     /// Delimiters whose indentation resets at a blank line
     pub soft_delims: Vec<char>,
+    /// Command blocks which indent their contents: opening command,
+    /// middle commands, closing command
+    pub command_blocks: Vec<Vec<String>>,
     /// Verbosity level for log messages
     pub verbosity: LevelFilter,
     /// Print arguments and exit
@@ -99,6 +102,8 @@ pub struct OptionArgs {
     pub indent_delims: Option<Vec<char>>,
     #[merge(strategy= merge::option::overwrite_none)]
     pub soft_delims: Option<Vec<char>>,
+    #[merge(strategy= merge::option::overwrite_none)]
+    pub command_blocks: Option<Vec<Vec<String>>>,
     #[merge(strategy= merge::option::overwrite_none)]
     pub verbosity: Option<LevelFilter>,
     #[merge(strategy= merge::option::overwrite_none)]
@@ -174,6 +179,7 @@ impl Default for OptionArgs {
             wrap_chars,
             indent_delims: Some(vec!['{', '(', '[']),
             soft_delims: Some(vec![]),
+            command_blocks: Some(vec![]),
             verbosity: Some(LevelFilter::Warn),
             arguments: Some(false),
             files: vec![],
@@ -204,6 +210,7 @@ impl OptionArgs {
             wrap_chars: vec![],
             indent_delims: None,
             soft_delims: None,
+            command_blocks: None,
             verbosity: None,
             arguments: None,
             files: vec![],
@@ -272,6 +279,7 @@ impl Args {
             wrap_chars: args.wrap_chars,
             indent_delims: args.indent_delims.unwrap(),
             soft_delims: args.soft_delims.unwrap(),
+            command_blocks: args.command_blocks.unwrap(),
             verbosity: args.verbosity.unwrap(),
             arguments: args.arguments.unwrap(),
             files: args.files,
@@ -469,6 +477,9 @@ impl fmt::Display for Args {
         display_args_list(&wrap_chars, "wrap-chars", f)?;
         display_args_list(&char_list(&self.indent_delims), "indent-delims", f)?;
         display_args_list(&char_list(&self.soft_delims), "soft-delims", f)?;
+        let blocks: Vec<String> =
+            self.command_blocks.iter().map(|b| b.join(" ")).collect();
+        display_args_list(&blocks, "command-blocks", f)?;
         display_arg_line(f, "format-tables", &self.format_tables.to_string())?;
         display_args_list(
             &self

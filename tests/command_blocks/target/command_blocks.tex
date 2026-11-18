@@ -1,0 +1,40 @@
+\documentclass{article}
+\usepackage{algpseudocode}
+
+\begin{document}
+
+\begin{algorithmic}[1]
+  \Procedure{Euclid}{$a, b$}
+    \State $r \gets a \bmod b$
+    \While{$r \neq 0$}
+      \State $a \gets b$
+      \State $b \gets r$
+      \State $r \gets a \bmod b$
+    \EndWhile
+    \State \Return $b$
+  \EndProcedure
+\end{algorithmic}
+
+\begin{algorithmic}
+  \ForAll{$p \in P$}
+    \If{$p$ is visible}
+      \State mark $p$
+    \ElsIf{$p$ is on the boundary}
+      \State test $p$
+    \Else
+      \For{$i = 1$ to $n$} \State skip $i$ \EndFor
+    \EndIf
+  \EndFor
+  \Repeat
+    \State $x \gets x + 1$
+  \Until{$x > n$}
+\end{algorithmic}
+
+% A missing \EndIf is closed by \end{algorithmic}
+\begin{algorithmic}
+  \If{$x$}
+    \State $y$
+\end{algorithmic}
+Text after.
+
+\end{document}

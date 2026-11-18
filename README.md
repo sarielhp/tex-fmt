@@ -31,7 +31,17 @@ https://mit-license.org/)
 >   ([#124](https://github.com/WGUNDERWOOD/tex-fmt/issues/124)).
 > - At `\end{name}`, delimiters left open since `\begin{name}` are closed,
 >   so a stray delimiter cannot shift lines beyond its environment.
-> - New options `indent-delims` and `soft-delims` (see
+> - Commands such as `\If ... \Else ... \EndIf` can indent their contents
+>   ([#107](https://github.com/WGUNDERWOOD/tex-fmt/issues/107)).
+> - `%` inside a `\url` or `\href` URL is not a comment
+>   ([#55](https://github.com/WGUNDERWOOD/tex-fmt/issues/55)).
+> - Fixes for crashes on deeply indented lines, unwritable files and
+>   malformed configuration files, from open upstream pull requests
+>   [#151](https://github.com/WGUNDERWOOD/tex-fmt/pull/151),
+>   [#156](https://github.com/WGUNDERWOOD/tex-fmt/pull/156),
+>   [#153](https://github.com/WGUNDERWOOD/tex-fmt/pull/153) and
+>   [#155](https://github.com/WGUNDERWOOD/tex-fmt/pull/155).
+> - New options `indent-delims`, `soft-delims` and `command-blocks` (see
 >   [Configuration](#configuration)).
 
 An extremely fast LaTeX formatter written in Rust.
@@ -420,4 +430,5 @@ The first example in each row is the default value.
 | `wrap-chars`     | arr[str] | `[]`, `["。"]`         | Characters after which lines may be wrapped |
 | `indent-delims`  | arr[str] | `["{", "(", "["]`, `["{"]` | Delimiters which affect indentation; `(` and `[` go together |
 | `soft-delims`    | arr[str] | `[]`, `["(", "["]`   | Delimiters which are forgotten at a blank line |
+| `command-blocks` | arr[arr[str]] | `[]`, `[["If", "Else", "EndIf"]]` | Commands indenting their contents: opening, middle, closing (e.g. `algorithmic`) |
 | `verbosity`      | str      | `"warn"`, `"error"`    | Verbosity level for terminal logging |

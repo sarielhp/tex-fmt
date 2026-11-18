@@ -174,6 +174,8 @@ enum Command {
     Right,
     Begin(String),
     End(String),
+    /// Any other command, by name
+    Name(String),
     Other,
 }
 
@@ -222,6 +224,7 @@ fn count_delims(
                             envs.truncate(i);
                         }
                     }
+                    Command::Name(name) => count_block(&name, args, count),
                     Command::Other => {}
                 }
             }
@@ -294,7 +297,30 @@ fn read_command(chars: &mut Peekable<Chars>) -> Command {
             }
             Command::Other
         }
-        _ => Command::Other,
+        _ => Command::Name(name),
+    }
+}
+
+/// Count a command which opens, continues or closes a command block
+///
+/// An opening command indents the following lines and a closing command
+/// ends that. A middle command, such as `\Else`, is dedented on its own
+/// line only, like `\item`.
+fn count_block(name: &str, args: &Args, count: &mut DelimCount) {
+    for block in &args.command_blocks {
+        let last = block.len() - 1;
+        if block[0] == name {
+            count.open(false);
+        } else if block[last] == name {
+            count.close(false);
+        } else if block[1..last].iter().any(|m| m == name) {
+            count.close(false);
+            count.back = max(count.diff, count.back);
+            count.open(false);
+        } else {
+            continue;
+        }
+        return;
     }
 }
 

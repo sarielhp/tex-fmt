@@ -1,0 +1,10 @@
+command-blocks = [
+  ["If", "ElsIf", "Else", "EndIf"],
+  ["For", "EndFor"],
+  ["ForAll", "EndFor"],
+  ["While", "EndWhile"],
+  ["Repeat", "Until"],
+  ["Loop", "EndLoop"],
+  ["\\Procedure", "\\EndProcedure"],
+  ["Function", "EndFunction"],
+]
