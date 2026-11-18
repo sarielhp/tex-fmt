@@ -58,7 +58,7 @@ pub static RE_SPLITTING: LazyLock<RegexSet> =
 // Matches splitting commands with non-whitespace characters before it.
 pub static RE_SPLITTING_SHARED_LINE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        [r"(:?\S.*?)", "(:?", SPLITTING_STRING.as_str(), ".*)"]
+        [r"(?:\S.*?)", "(?:", SPLITTING_STRING.as_str(), ".*)"]
             .concat()
             .as_str(),
     )

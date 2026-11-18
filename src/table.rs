@@ -3,7 +3,6 @@
 use crate::format::{Pattern, State};
 use crate::regexes::{TABLES_BEGIN, TABLES_END};
 use crate::LINE_END;
-use itertools::Itertools;
 use regex::Regex;
 
 // Remove all double spaces from the table
@@ -48,12 +47,13 @@ fn add_line_breaks(text: &str) -> (String, bool) {
     (new_text, finished)
 }
 
-// Get the starting positions of all delims
+// Get the starting positions of all delims, as character columns
 fn get_positions(text: &str) -> Vec<Vec<usize>> {
     text.lines()
         .map(|l| {
             let mut prev = None;
-            l.char_indices()
+            l.chars()
+                .enumerate()
                 .filter_map(|(i, c)| {
                     let is_match = c == '&' && prev != Some('\\');
                     prev = Some(c);
@@ -111,13 +111,15 @@ fn get_offsets(
 fn format_table_line(line: &str, offsets_delims_row: &[usize]) -> String {
     let mut new_line = String::new();
     let mut j = 0;
+    let mut prev = None;
     for c in line.chars() {
-        if c == '&' {
+        if c == '&' && prev != Some('\\') {
             let offset = offsets_delims_row.get(j).copied().unwrap_or(0);
             new_line.extend(std::iter::repeat_n(' ', offset));
             j += 1;
         }
         new_line.push(c);
+        prev = Some(c);
     }
     new_line
 }
@@ -157,62 +159,53 @@ fn contains_table_end(line: &str) -> bool {
     TABLES_END.iter().any(|r| line.contains(r))
 }
 
-// Locate all the tables in the text
-fn find_table_positions(text: &str) -> Vec<(usize, usize)> {
+// Locate all the tables in the lines, as pairs of first and last line,
+// leaving out any table with a protected (verbatim or ignored) line
+fn find_table_positions(
+    lines: &[&str],
+    protected: &[bool],
+) -> Vec<(usize, usize)> {
     let mut table_positions = vec![];
-    let mut begin: usize = 0;
-    let mut end: usize;
-    for (linum, line) in text.lines().enumerate() {
-        if contains_table_begin(line) {
-            begin = linum;
+    let mut begin: Option<usize> = None;
+    for (linum, line) in lines.iter().enumerate() {
+        if protected.get(linum).copied().unwrap_or(false) {
+            begin = None;
+        } else if contains_table_begin(line) {
+            begin = Some(linum);
         } else if contains_table_end(line) {
-            end = linum;
-            table_positions.push((begin, end));
+            if let Some(b) = begin.take() {
+                table_positions.push((b, linum));
+            }
         }
     }
     table_positions
 }
 
-// Format all the tables in the text
+/// Format all the tables in the text
+///
+/// `protected` says for each line whether it is verbatim or ignored; a
+/// table containing such a line is left alone.
 #[must_use]
-pub fn format_tables(text: &str) -> String {
-    let table_positions = find_table_positions(text);
+pub fn format_tables(text: &str, protected: &[bool]) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let table_positions = find_table_positions(&lines, protected);
     if table_positions.is_empty() {
         return text.to_string();
     }
-
-    let first_table_begin = table_positions[0].0;
-    let mut new_text: String =
-        text.lines().take(first_table_begin).join(LINE_END);
-    new_text.push_str(LINE_END);
-
-    for (t, table_position) in table_positions.iter().enumerate() {
-        // format each table
-        let begin = table_position.0;
-        let end = table_position.1;
-        let table_text: String = text
-            .lines()
-            .skip(begin)
-            .take(end - begin + 1)
-            .join(LINE_END);
-        let new_table_text = format_table(&table_text);
-        new_text.push_str(&new_table_text);
-
-        // format text following each table
-        let next_table_begin = if t + 1 < table_positions.len() {
-            table_positions[t + 1].0
-        } else {
-            text.lines().count()
-        };
-        let next_text: String = text
-            .lines()
-            .skip(end + 1)
-            .take(next_table_begin - end - 1)
-            .join(LINE_END);
-        new_text.push_str(&next_text);
+    let mut new_text = String::with_capacity(text.len());
+    let mut next = 0;
+    for (begin, end) in table_positions {
+        for line in &lines[next..begin] {
+            new_text.push_str(line);
+            new_text.push_str(LINE_END);
+        }
+        new_text.push_str(&format_table(&lines[begin..=end].join(LINE_END)));
+        next = end + 1;
+    }
+    for line in &lines[next..] {
+        new_text.push_str(line);
         new_text.push_str(LINE_END);
     }
-
     new_text
 }
 

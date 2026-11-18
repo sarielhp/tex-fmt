@@ -38,6 +38,8 @@ pub fn format_file(
     let mut state = State::new();
     let mut queue: Vec<(usize, String)> = vec![];
     let mut new_text = String::with_capacity(2 * old_text.len());
+    // Whether each line of new_text is verbatim or ignored
+    let mut protected: Vec<bool> = vec![];
 
     // Select the character used for indentation.
     let indent_char = match args.tabchar {
@@ -65,7 +67,7 @@ pub fn format_file(
             temp_state.linum_old = linum_old;
 
             // If the line should not be ignored...
-            if !set_ignore_and_report(
+            let ignored = set_ignore_and_report(
                 &line,
                 &mut temp_state,
                 logs,
@@ -73,7 +75,8 @@ pub fn format_file(
                 &pattern,
                 &verbatims_begin,
                 &verbatims_end,
-            ) {
+            );
+            if !ignored {
                 // Check if the line should be split because of a pattern
                 // that should begin on a new line.
                 if subs::needs_split(&line, &pattern) {
@@ -139,6 +142,7 @@ pub fn format_file(
             state = temp_state;
             new_text.push_str(&line);
             new_text.push_str(LINE_END);
+            protected.push(ignored);
             state.linum_new += 1;
         } else if let Some((linum_old, line)) = old_lines.next() {
             queue.push((linum_old, line.to_string()));
@@ -166,7 +170,7 @@ pub fn format_file(
 
     // Format tables
     if args.format_tables {
-        new_text = format_tables(&new_text);
+        new_text = format_tables(&new_text, &protected);
     }
 
     new_text = subs::remove_trailing_spaces(&new_text);

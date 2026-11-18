@@ -7,21 +7,25 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 
-/// Add a missing extension and read the file
-///
-/// # Panics
-///
-/// This function panics when a file extension cannot be converted to a string.
+/// Read a file with an accepted extension
 pub fn read(file: &PathBuf, logs: &mut Vec<Log>) -> Option<String> {
     // Check if file has an accepted extension
-    let ext = file.extension().unwrap().to_str().unwrap();
-    let has_ext = EXTENSIONS.contains(&ext);
+    let has_ext = file
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| EXTENSIONS.contains(&e));
 
-    if let Ok(text) = fs::read_to_string(file) {
+    let result = fs::read_to_string(file);
+    if let Ok(text) = result {
         return Some(text);
     }
-    if has_ext {
-        record_file_log(logs, Error, file, "Could not open file.");
+    if let (true, Err(e)) = (has_ext, result) {
+        record_file_log(
+            logs,
+            Error,
+            file,
+            &format!("Could not open file: {e}"),
+        );
     } else {
         record_file_log(logs, Error, file, "File type invalid.");
     }

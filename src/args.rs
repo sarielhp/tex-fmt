@@ -455,7 +455,11 @@ impl fmt::Display for Args {
         write!(f, "{}", "tex-fmt".magenta().bold())?;
         display_arg_line(f, "check", &self.check.to_string())?;
         display_arg_line(f, "print", &self.print.to_string())?;
-        display_arg_line(f, "fail-on-change", &self.print.to_string())?;
+        display_arg_line(
+            f,
+            "fail-on-change",
+            &self.fail_on_change.to_string(),
+        )?;
         display_arg_line(f, "wrap", &self.wrap.to_string())?;
         display_arg_line(f, "wraplen", &self.wraplen.to_string())?;
         display_arg_line(f, "wrapmin", &self.wrapmin.to_string())?;
