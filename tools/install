@@ -1,0 +1,49 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Build tex-fmt in release mode and install the binary into ~/bin.
+#
+# Usage: tools/install [--skip-tests]
+#
+# Runs the test suite first (unless --skip-tests), then copies
+# target/release/tex-fmt to ~/bin/tex-fmt atomically, so a running
+# formatter never sees a half-written binary.
+
+require 'fileutils'
+require 'open3'
+
+ROOT = File.expand_path('..', __dir__)
+TARGET_DIR = File.join(Dir.home, 'bin')
+BINARY = File.join(ROOT, 'target', 'release', 'tex-fmt')
+
+def run!(*cmd)
+  puts "+ #{cmd.join(' ')}"
+  system(*cmd, chdir: ROOT) || abort("tools/install: failed: #{cmd.join(' ')}")
+end
+
+def install_binary
+  FileUtils.mkdir_p(TARGET_DIR)
+  dest = File.join(TARGET_DIR, 'tex-fmt')
+  temp = "#{dest}.install-#{Process.pid}"
+  FileUtils.cp(BINARY, temp)
+  File.chmod(0o755, temp)
+  File.rename(temp, dest)
+  dest
+ensure
+  FileUtils.rm_f(temp) if temp
+end
+
+def report(dest)
+  version, = Open3.capture2(dest, '--version')
+  puts "Installed #{dest} (#{version.strip})"
+  first = ENV.fetch('PATH', '').split(File::PATH_SEPARATOR)
+             .map { |dir| File.join(dir, 'tex-fmt') }
+             .find { |path| File.executable?(path) }
+  return if first.nil? || File.identical?(first, dest)
+
+  warn "Note: #{first} comes first in PATH and shadows #{dest}"
+end
+
+run!('cargo', 'test', '--release', '--quiet') unless ARGV.include?('--skip-tests')
+run!('cargo', 'build', '--release', '--quiet')
+report(install_binary)
