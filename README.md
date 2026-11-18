@@ -13,6 +13,27 @@ https://repology.org/project/tex-fmt/versions)
 https://shields.io/badge/license-MIT-blue.svg)](
 https://mit-license.org/)
 
+> [!NOTE]
+> **This is a patched fork of
+> [WGUNDERWOOD/tex-fmt](https://github.com/WGUNDERWOOD/tex-fmt),
+> developed with AI programming tools:** the changes in this fork were
+> written with [Claude Code](https://claude.com/claude-code) (Claude Opus
+> 5.5), directed and reviewed by
+> [Sariel Har-Peled](https://github.com/sarielhp).
+> All credit for tex-fmt itself goes to its author and contributors.
+>
+> Changes from upstream:
+>
+> - `\left` and `\right` pair with each other whatever their delimiters,
+>   so `\left\{ ... \right.` no longer shifts the rest of the file
+>   ([#72](https://github.com/WGUNDERWOOD/tex-fmt/issues/72)).
+> - Escaped braces `\{` and `\}` are soft delimiters
+>   ([#124](https://github.com/WGUNDERWOOD/tex-fmt/issues/124)).
+> - At `\end{name}`, delimiters left open since `\begin{name}` are closed,
+>   so a stray delimiter cannot shift lines beyond its environment.
+> - New options `indent-delims` and `soft-delims` (see
+>   [Configuration](#configuration)).
+
 An extremely fast LaTeX formatter written in Rust.
 Indentation, line wrapping and other formatting for LaTeX source code.
 Try it out now in your
@@ -397,4 +418,6 @@ The first example in each row is the default value.
 | `verbatims`      | arr[str] | `[]`, `["myverbatim"]` | Extra verbatim environments |
 | `no-indent-envs` | arr[str] | `[]`, `["mydocument"]` | Environments which are not indented |
 | `wrap-chars`     | arr[str] | `[]`, `["。"]`         | Characters after which lines may be wrapped |
+| `indent-delims`  | arr[str] | `["{", "(", "["]`, `["{"]` | Delimiters which affect indentation; `(` and `[` go together |
+| `soft-delims`    | arr[str] | `[]`, `["(", "["]`   | Delimiters which are forgotten at a blank line |
 | `verbosity`      | str      | `"warn"`, `"error"`    | Verbosity level for terminal logging |
