@@ -29,7 +29,8 @@ fn error_object(message: &str) -> JsValue {
 #[must_use]
 pub fn main(text: &str, config: &str) -> JsValue {
     // Get args
-    let config = Some((PathBuf::new(), String::new(), config.to_string()));
+    let config =
+        Some((PathBuf::new(), "<config>".to_string(), config.to_string()));
     let mut args: OptionArgs = match get_config_args(config) {
         Ok(args) => args.unwrap_or_else(OptionArgs::new),
         Err(message) => return error_object(&message),
@@ -40,7 +41,9 @@ pub fn main(text: &str, config: &str) -> JsValue {
 
     // Run tex-fmt
     let mut logs = Vec::<Log>::new();
-    args.resolve(&mut logs);
+    if args.resolve(&mut logs) != 0 {
+        return error_object(&format_logs(&mut logs, &args));
+    }
     let file = PathBuf::from("input");
     let new_text = format_file(text, &file, &args, &mut logs);
     let logs = format_logs(&mut logs, &args);

@@ -98,14 +98,14 @@ fn parse_array_string(
         return Ok(vec![]);
     };
     let arr = v.as_array().ok_or_else(|| {
-        format!("{name}: expected an array, found a {}", v.type_str())
+        format!("{name}: expected an array, found {}", a_type(v))
     })?;
     arr.iter()
         .map(|e| {
             e.as_str().map(String::from).ok_or_else(|| {
                 format!(
-                    "{name}: expected an array of strings, found a {} entry",
-                    e.type_str()
+                    "{name}: expected an array of strings, found {} entry",
+                    a_type(e)
                 )
             })
         })
@@ -116,7 +116,7 @@ fn parse_array_string(
 fn expect_bool(config: &Table, name: &str) -> Result<Option<bool>, String> {
     config.get(name).map_or(Ok(None), |v| {
         v.as_bool().map(Some).ok_or_else(|| {
-            format!("{name}: expected a boolean, found a {}", v.type_str())
+            format!("{name}: expected a boolean, found {}", a_type(v))
         })
     })
 }
@@ -128,7 +128,7 @@ fn expect_str<'a>(
 ) -> Result<Option<&'a str>, String> {
     config.get(name).map_or(Ok(None), |v| {
         v.as_str().map(Some).ok_or_else(|| {
-            format!("{name}: expected a string, found a {}", v.type_str())
+            format!("{name}: expected a string, found {}", a_type(v))
         })
     })
 }
@@ -140,7 +140,7 @@ fn expect_integer<T: TryFrom<i64>>(
 ) -> Result<Option<T>, String> {
     config.get(name).map_or(Ok(None), |v| {
         let i = v.as_integer().ok_or_else(|| {
-            format!("{name}: expected an integer, found a {}", v.type_str())
+            format!("{name}: expected an integer, found {}", a_type(v))
         })?;
         T::try_from(i)
             .map(Some)
@@ -159,6 +159,17 @@ fn string_to_char(name: &str, s: &str) -> Result<char, String> {
     Ok(c)
 }
 
+/// The TOML type of a value with its indefinite article, as "an integer"
+fn a_type(v: &Value) -> String {
+    let t = v.type_str();
+    let article = if t.starts_with(['a', 'e', 'i', 'o', 'u']) {
+        "an"
+    } else {
+        "a"
+    };
+    format!("{article} {t}")
+}
+
 /// Parse `command-blocks`: an array of blocks, each an array of command
 /// names (opening, middle and closing), with or without a backslash
 fn parse_command_blocks(v: &Value) -> Result<Vec<Vec<String>>, String> {
@@ -169,7 +180,8 @@ fn parse_command_blocks(v: &Value) -> Result<Vec<Vec<String>>, String> {
              such as [[\"If\", \"Else\", \"EndIf\"]]"
         )
     };
-    v.as_array()
+    let blocks = v
+        .as_array()
         .ok_or_else(shape)?
         .iter()
         .map(|block| {
@@ -197,7 +209,41 @@ fn parse_command_blocks(v: &Value) -> Result<Vec<Vec<String>>, String> {
             }
             Ok(names)
         })
-        .collect()
+        .collect::<Result<Vec<Vec<String>>, String>>()?;
+    check_block_roles(&blocks)?;
+    Ok(blocks)
+}
+
+/// Each command must have one role (opening, middle or closing) in all
+/// blocks; a closing command may end several blocks, as `\EndFor` ends
+/// both `\For` and `\ForAll`
+fn check_block_roles(blocks: &[Vec<String>]) -> Result<(), String> {
+    let mut roles: Vec<(&str, &str)> = vec![];
+    for block in blocks {
+        let last = block.len() - 1;
+        for (i, name) in block.iter().enumerate() {
+            let role = match i {
+                0 => "an opening",
+                i if i == last => "a closing",
+                _ => "a middle",
+            };
+            if block[..i].contains(name) {
+                return Err(format!(
+                    "command-blocks: \\{name} appears twice in one block"
+                ));
+            }
+            match roles.iter().find(|(n, _)| n == name) {
+                Some((_, r)) if *r != role => {
+                    return Err(format!(
+                        "command-blocks: \\{name} is both {r} and {role} command"
+                    ));
+                }
+                Some(_) => {}
+                None => roles.push((name, role)),
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Parse arguments from a config file path
@@ -215,8 +261,17 @@ pub fn get_config_args(
     let config = config.parse::<Table>().map_err(|e| {
         format!("config: failed to parse file at {config_path_string}: {e}")
     })?;
+    parse_config_table(&config, config_path)
+        .map(Some)
+        .map_err(|e| format!("config {config_path_string}: {e}"))
+}
 
-    let verbosity = match expect_str(&config, "verbosity")? {
+/// Read the arguments from a parsed config file
+fn parse_config_table(
+    config: &Table,
+    config_path: PathBuf,
+) -> Result<OptionArgs, String> {
+    let verbosity = match expect_str(config, "verbosity")? {
         Some("error" | "quiet") => Some(LevelFilter::Error),
         Some("warn") => Some(LevelFilter::Warn),
         Some("info" | "verbose") => Some(LevelFilter::Info),
@@ -230,7 +285,7 @@ pub fn get_config_args(
         None => None,
     };
 
-    let tabchar = match expect_str(&config, "tabchar")? {
+    let tabchar = match expect_str(config, "tabchar")? {
         Some("tab") => Some(TabChar::Tab),
         Some("space") => Some(TabChar::Space),
         Some(other) => {
@@ -242,7 +297,7 @@ pub fn get_config_args(
     };
 
     // Read wrap_chars to Vec<char> not Vec<String>
-    let wrap_chars: Vec<char> = parse_array_string(&config, "wrap-chars")?
+    let wrap_chars: Vec<char> = parse_array_string(config, "wrap-chars")?
         .iter()
         .map(|c| string_to_char("wrap-chars", c))
         .collect::<Result<Vec<char>, String>>()?;
@@ -252,7 +307,7 @@ pub fn get_config_args(
         if config.get(name).is_none() {
             return Ok(None);
         }
-        parse_array_string(&config, name)?
+        parse_array_string(config, name)?
             .iter()
             .map(|c| string_to_char(name, c))
             .collect::<Result<Vec<char>, String>>()
@@ -265,20 +320,20 @@ pub fn get_config_args(
         .transpose()?;
 
     let args = OptionArgs {
-        check: expect_bool(&config, "check")?,
-        print: expect_bool(&config, "print")?,
-        fail_on_change: expect_bool(&config, "fail-on-change")?,
-        wrap: expect_bool(&config, "wrap")?,
-        wraplen: expect_integer(&config, "wraplen")?,
-        wrapmin: expect_integer(&config, "wrapmin")?,
-        tabsize: expect_integer(&config, "tabsize")?,
+        check: expect_bool(config, "check")?,
+        print: expect_bool(config, "print")?,
+        fail_on_change: expect_bool(config, "fail-on-change")?,
+        wrap: expect_bool(config, "wrap")?,
+        wraplen: expect_integer(config, "wraplen")?,
+        wrapmin: expect_integer(config, "wrapmin")?,
+        tabsize: expect_integer(config, "tabsize")?,
         tabchar,
-        stdin: expect_bool(&config, "stdin")?,
+        stdin: expect_bool(config, "stdin")?,
         config: Some(config_path),
         noconfig: None,
-        lists: parse_array_string(&config, "lists")?,
-        verbatims: parse_array_string(&config, "verbatims")?,
-        no_indent_envs: parse_array_string(&config, "no-indent-envs")?,
+        lists: parse_array_string(config, "lists")?,
+        verbatims: parse_array_string(config, "verbatims")?,
+        no_indent_envs: parse_array_string(config, "no-indent-envs")?,
         wrap_chars,
         indent_delims: char_array("indent-delims")?,
         soft_delims: char_array("soft-delims")?,
@@ -287,7 +342,7 @@ pub fn get_config_args(
         arguments: None,
         files: vec![],
         recursive: None,
-        format_tables: expect_bool(&config, "format-tables")?,
+        format_tables: expect_bool(config, "format-tables")?,
     };
-    Ok(Some(args))
+    Ok(args)
 }

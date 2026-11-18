@@ -417,3 +417,51 @@ fn test_config_tabchar_unrecognized() {
     let message = result.expect_err("expected an error, not a panic");
     assert!(message.contains("tabchar"));
 }
+
+#[test]
+fn config_errors_name_the_file() {
+    let message = get_config_args_from_str("tabsize = 300\n").unwrap_err();
+    assert!(
+        message.starts_with("config tex-fmt.toml: tabsize"),
+        "{message}"
+    );
+}
+
+#[test]
+fn config_error_uses_the_right_article() {
+    let message = get_config_args_from_str("lists = [5]\n").unwrap_err();
+    assert!(message.contains("found an integer entry"), "{message}");
+}
+
+#[test]
+fn command_blocks_reject_bad_blocks() {
+    for (toml, expected) in [
+        ("command-blocks = \"If\"\n", "array of arrays"),
+        ("command-blocks = [[\"If\"]]\n", "opening and a closing"),
+        ("command-blocks = [[\"If\", \"End If\"]]\n", "not a command name"),
+        ("command-blocks = [[\"If\", \"If\"]]\n", "twice in one block"),
+        (
+            "command-blocks = [[\"If\", \"Else\", \"EndIf\"], [\"Else\", \"X\"]]\n",
+            "both a middle and an opening",
+        ),
+    ] {
+        let message = get_config_args_from_str(toml).unwrap_err();
+        assert!(message.contains(expected), "{toml}: {message}");
+    }
+}
+
+#[test]
+fn command_blocks_accept_a_shared_closer() {
+    let args = get_config_args_from_str(
+        "command-blocks = [[\"\\\\For\", \"EndFor\"], [\"ForAll\", \"EndFor\"]]\n",
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        args.command_blocks,
+        Some(vec![
+            vec!["For".to_string(), "EndFor".to_string()],
+            vec!["ForAll".to_string(), "EndFor".to_string()],
+        ])
+    );
+}
