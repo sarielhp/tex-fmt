@@ -1,0 +1,2 @@
+--tabsize 1
+--wraplen 1000

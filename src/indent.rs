@@ -19,13 +19,22 @@ const DELIMS: [(char, char); 3] = [('{', '}'), ('(', ')'), ('[', ']')];
 #[derive(Debug, Clone)]
 pub struct Indent {
     /// The indentation level of a line
-    pub actual: i8,
+    pub actual: i32,
     /// The visual indentation level of a line
-    pub visual: i8,
+    pub visual: i32,
     /// The number of soft delimiters left open in the current paragraph
-    pub soft: i8,
+    pub soft: i32,
     /// The number of delimiters left open overall
-    pub depth: i8,
+    pub depth: i32,
+}
+
+impl Indent {
+    /// Width of the visual indentation in characters; a negative indent,
+    /// already reported, counts as none
+    #[must_use]
+    pub fn width(&self, tabsize: u8) -> usize {
+        usize::try_from(self.visual).unwrap_or(0) * usize::from(tabsize)
+    }
 }
 
 impl Indent {
@@ -55,26 +64,26 @@ fn get_diff(
     lists_end: &[String],
     no_indent_envs_begin: &[String],
     no_indent_envs_end: &[String],
-) -> i8 {
+) -> i32 {
     // Do not indent if line contains \verb|...|
     if pattern.contains_verb && VERBS.iter().any(|x| line.contains(x)) {
         return 0;
     }
 
     // Indentation for environments
-    let mut diff: i8 = 0;
+    let mut diff: i32 = 0;
     if pattern.contains_env_begin && line.contains(ENV_BEGIN) {
         if no_indent_envs_begin.iter().any(|r| line.contains(r)) {
             return 0;
         }
         diff += 1;
-        diff += i8::from(lists_begin.iter().any(|r| line.contains(r)));
+        diff += i32::from(lists_begin.iter().any(|r| line.contains(r)));
     } else if pattern.contains_env_end && line.contains(ENV_END) {
         if no_indent_envs_end.iter().any(|r| line.contains(r)) {
             return 0;
         }
         diff -= 1;
-        diff -= i8::from(lists_end.iter().any(|r| line.contains(r)));
+        diff -= i32::from(lists_end.iter().any(|r| line.contains(r)));
     }
 
     diff
@@ -87,12 +96,12 @@ fn get_back(
     state: &State,
     lists_end: &[String],
     no_indent_envs_end: &[String],
-) -> i8 {
+) -> i32 {
     // Only need to dedent if indentation is present
     if state.indent.actual == 0 {
         return 0;
     }
-    let mut back: i8 = 0;
+    let mut back: i32 = 0;
 
     // Don't apply any indenting if a \verb|...| is present
     if pattern.contains_verb && VERBS.iter().any(|x| line.contains(x)) {
@@ -127,26 +136,26 @@ pub struct EnvMark {
     /// Name of the environment
     name: String,
     /// Delimiter depth at the `\begin`
-    depth: i8,
+    depth: i32,
     /// Number of open soft delimiters at the `\begin`
-    soft: i8,
+    soft: i32,
 }
 
 /// Running delimiter count for one line
 struct DelimCount {
     /// Change in indentation, negative for indenting
-    diff: i8,
+    diff: i32,
     /// Largest dedent reached on the line
-    back: i8,
+    back: i32,
     /// Number of soft delimiters open in the current paragraph
-    soft: i8,
+    soft: i32,
     /// Number of delimiters open overall
-    depth: i8,
+    depth: i32,
 }
 
 impl DelimCount {
     fn open(&mut self, is_soft: bool) {
-        self.soft += i8::from(is_soft);
+        self.soft += i32::from(is_soft);
         self.depth += 1;
         self.diff -= 1;
     }
@@ -154,7 +163,7 @@ impl DelimCount {
     /// A soft closing delimiter without an open partner is ignored
     fn close(&mut self, is_soft: bool) {
         if !is_soft || self.soft > 0 {
-            self.soft -= i8::from(is_soft);
+            self.soft -= i32::from(is_soft);
             self.depth -= 1;
             self.diff += 1;
         }
@@ -489,9 +498,7 @@ pub fn apply_indent(
     }
 
     // If line is correctly indented, return it directly
-    #[allow(clippy::cast_sign_loss)]
-    let n_indent_chars =
-        (i16::from(indent.visual) * i16::from(args.tabsize)) as usize;
+    let n_indent_chars = indent.width(args.tabsize);
     if first_non_whitespace == Some(n_indent_chars) {
         return line.into();
     }

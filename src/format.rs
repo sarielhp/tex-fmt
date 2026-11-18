@@ -100,10 +100,7 @@ pub fn format_file(
                     &no_indent_envs_end,
                 );
 
-                let indent_length = usize::try_from(
-                    i16::from(indent.visual) * i16::from(args.tabsize),
-                )
-                .expect("Visual indent is non-negative.");
+                let indent_length = indent.width(args.tabsize);
 
                 // Wrap the line before applying the indent, and loop back
                 // if the line needed wrapping.
