@@ -5,6 +5,7 @@ use crate::comments::{find_comment_index, remove_comment};
 use crate::format::{Pattern, State};
 use crate::logging::{record_line_log, Log};
 use crate::regexes::{ENV_BEGIN, ENV_END, ITEM};
+use crate::verbatim::strip_verbs;
 use core::cmp::max;
 use log::Level;
 use log::LevelFilter;
@@ -65,10 +66,14 @@ fn get_diff(
     no_indent_envs_begin: &[String],
     no_indent_envs_end: &[String],
 ) -> i32 {
-    // Do not indent if line contains \verb|...|
-    if pattern.contains_verb {
-        return 0;
-    }
+    // Environments inside \verb|...| do not count
+    let stripped;
+    let line = if pattern.contains_verb {
+        stripped = strip_verbs(line);
+        stripped.as_str()
+    } else {
+        line
+    };
 
     // Indentation for environments
     let mut diff: i32 = 0;
@@ -103,10 +108,14 @@ fn get_back(
     }
     let mut back: i32 = 0;
 
-    // Don't apply any indenting if a \verb|...| is present
-    if pattern.contains_verb {
-        return 0;
-    }
+    // Environments inside \verb|...| do not count
+    let stripped;
+    let line = if pattern.contains_verb {
+        stripped = strip_verbs(line);
+        stripped.as_str()
+    } else {
+        line
+    };
 
     // Calculate dedentation for environments
     if pattern.contains_env_end && line.contains(ENV_END) {

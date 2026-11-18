@@ -343,6 +343,7 @@ fn parse_config_table(
         files: vec![],
         recursive: None,
         format_tables: expect_bool(config, "format-tables")?,
+        split_after_begin: expect_bool(config, "split-after-begin")?,
     };
     Ok(args)
 }

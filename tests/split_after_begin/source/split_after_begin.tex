@@ -1,0 +1,35 @@
+\documentclass{article}
+\begin{document}
+
+% Text after \begin{env} and its arguments goes on a new line
+\begin{equation*} \psi:\left\{
+\begin{array}{rcl} \Re^d& \rightarrow& \Re^{d+1}\\x &\mapsto& x^2
+\end{array}\right.
+\end{equation*}
+
+% Optional and mandatory arguments stay with \begin, in any order
+\begin{theorem}[bogi mogi]{shogi fogi} The statement.
+\end{theorem}
+\begin{tabular}{p{3cm}l} a & b \\
+\end{tabular}
+\begin{lemma} [With a space] Text.
+\end{lemma}
+\begin{itemize} \item One
+\end{itemize}
+\begin{center} \verb|x| moves intact, and \verb|\begin{y}| does not count
+\end{center}
+\begin{equation*}\begin{aligned} a &= b
+\end{aligned}\end{equation*}
+
+% No split: only a comment follows, an argument continues on the next
+% line, or a verbatim environment
+\begin{proof} % of the theorem
+Done.
+\end{proof}
+\begin{theorem}[A long
+name] Text.
+\end{theorem}
+\begin{verbatim} keep \begin{this} as is
+\end{verbatim}
+
+\end{document}

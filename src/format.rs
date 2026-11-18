@@ -86,6 +86,12 @@ pub fn format_file(
                     // ... and queue the second part for formatting.
                     queue.push((linum_old, next_line.to_string()));
                     line = this_line.to_string();
+                } else if let Some(p) =
+                    subs::split_after_begin_point(&line, &pattern, args)
+                {
+                    // Put the text after \begin{env} on its own line
+                    queue.push((linum_old, line[p..].trim_start().to_string()));
+                    line = line[..p].to_string();
                 }
 
                 // Calculate the indent based on the current state

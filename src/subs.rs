@@ -84,6 +84,67 @@ pub fn needs_split(line: &str, pattern: &Pattern) -> bool {
     }
 }
 
+/// Where to split a line which starts with `\begin{env}`, so that the text
+/// after the environment's arguments goes on a new line
+/// (`split-after-begin`)
+///
+/// The arguments are the `[...]` and `{...}` groups directly after
+/// `\begin{env}`, as in `\begin{theorem}[Name]{Text}` or
+/// `\begin{tabular}{p{3cm}l}`; a `[...]` group may follow spaces. There is
+/// no split when nothing but a comment follows, when an argument is not
+/// closed on the line, or for verbatim environments. A `\verb` after the
+/// split point moves to the new line intact.
+#[must_use]
+pub fn split_after_begin_point(
+    line: &str,
+    pattern: &Pattern,
+    args: &Args,
+) -> Option<usize> {
+    if !args.split_after_begin || !pattern.contains_env_begin {
+        return None;
+    }
+    let start = line.len() - line.trim_start().len();
+    let after = line[start..].strip_prefix(regexes::ENV_BEGIN)?;
+    let env = &after[..after.find('}')?];
+    if args.verbatims.iter().any(|v| v == env) {
+        return None;
+    }
+    let bytes = line.as_bytes();
+    let mut i = start + regexes::ENV_BEGIN.len() + env.len() + 1;
+    loop {
+        let j = i + bytes[i..]
+            .iter()
+            .take_while(|b| b.is_ascii_whitespace())
+            .count();
+        match bytes.get(j) {
+            Some(b'[') => i = group_end(bytes, j, b']')?,
+            Some(b'{') if j == i => i = group_end(bytes, j, b'}')?,
+            _ => break,
+        }
+    }
+    let text = line[i..].trim_start();
+    (!text.is_empty() && !text.starts_with('%')).then_some(i)
+}
+
+/// The index after the `close` ending a group opened at `start`, skipping
+/// nested braces and escaped characters, or `None` if the group is not
+/// closed on the line
+fn group_end(bytes: &[u8], start: usize, close: u8) -> Option<usize> {
+    let mut depth = 0;
+    let mut i = start + 1;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' => i += 1,
+            b if b == close && depth == 0 => return Some(i + 1),
+            b'{' => depth += 1,
+            b'}' => depth -= 1,
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
 /// Ensure lines are split correctly.
 ///
 /// Returns a tuple containing:

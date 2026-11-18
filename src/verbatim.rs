@@ -43,6 +43,19 @@ pub fn verb_spans(line: &str) -> Vec<(usize, usize)> {
     spans
 }
 
+/// The line without its inline verbatim commands (see [`verb_spans`])
+#[must_use]
+pub fn strip_verbs(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut from = 0;
+    for (start, end) in verb_spans(line) {
+        out.push_str(&line[from..start]);
+        from = end;
+    }
+    out.push_str(&line[from..]);
+    out
+}
+
 /// The index after the closing delimiter of a span whose opening
 /// delimiter is at `start`, or the end of the line
 fn delimited_end(line: &str, start: usize) -> usize {

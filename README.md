@@ -92,6 +92,16 @@ configuration formats as before apart from the fixes above.
 
 ### Comments, splitting and wrapping
 
+- New option **`split-after-begin`** (default `false`) puts the text after
+  `\begin{env}` and its arguments on a new line, so
+  `\begin{equation*} x = 1` becomes `\begin{equation*}` and an indented
+  `x = 1`. The arguments are the `[...]` and `{...}` groups right after
+  `\begin{env}`, in any order, as in `\begin{theorem}[Name]{Text}` or
+  `\begin{tabular}{p{3cm}l}`. A trailing comment, an argument continued
+  on the next line, and verbatim environments are left alone.
+- `\begin` and `\end` on a line with `\verb` now indent as usual; upstream
+  ignored them, so `\begin{center} \verb|x|` left a negative indent at
+  `\end{center}`. Environments inside `\verb|...|` still do not count.
 - **`%` in URLs is not a comment**: inside the URL argument of `\url`,
   `\href` (also with an optional argument), `\nolinkurl` and `\path`,
   including the `\url|...|` form
@@ -529,4 +539,5 @@ The first example in each row is the default value.
 | `indent-delims`  | arr[str] | `["{", "(", "["]`, `["{"]` | Delimiters which affect indentation; `(` and `[` go together, and `\{` follows `(` |
 | `soft-delims`    | arr[str] | `[]`, `["(", "["]`   | Delimiters which are forgotten at a blank line; `\{` follows `(` |
 | `command-blocks` | arr[arr[str]] | `[]`, `[["If", "Else", "EndIf"]]` | Commands indenting their contents: opening, middle, closing (e.g. `algorithmic`) |
+| `split-after-begin` | bool | `false` | Put the text after `\begin{env}` and its arguments on a new line |
 | `verbosity`      | str      | `"warn"`, `"error"`    | Verbosity level for terminal logging |

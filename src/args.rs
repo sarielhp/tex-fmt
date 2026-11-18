@@ -62,6 +62,8 @@ pub struct Args {
     pub recursive: bool,
     /// Enable table formatting
     pub format_tables: bool,
+    /// Put the text after `\begin{env}` and its arguments on a new line
+    pub split_after_begin: bool,
 }
 
 /// Arguments using Options to track CLI/config file/default values
@@ -114,6 +116,8 @@ pub struct OptionArgs {
     pub recursive: Option<bool>,
     #[merge(strategy= merge::option::overwrite_none)]
     pub format_tables: Option<bool>,
+    #[merge(strategy= merge::option::overwrite_none)]
+    pub split_after_begin: Option<bool>,
 }
 
 fn merge_wrap_chars(left: &mut Vec<char>, right: Vec<char>) {
@@ -185,6 +189,7 @@ impl Default for OptionArgs {
             files: vec![],
             recursive: Some(false),
             format_tables: Some(false),
+            split_after_begin: Some(false),
         }
     }
 }
@@ -216,6 +221,7 @@ impl OptionArgs {
             files: vec![],
             recursive: None,
             format_tables: None,
+            split_after_begin: None,
         }
     }
 }
@@ -285,6 +291,7 @@ impl Args {
             files: args.files,
             recursive: args.recursive.unwrap(),
             format_tables: args.format_tables.unwrap(),
+            split_after_begin: args.split_after_begin.unwrap(),
         }
     }
 
@@ -485,6 +492,11 @@ impl fmt::Display for Args {
             self.command_blocks.iter().map(|b| b.join(" ")).collect();
         display_args_list(&blocks, "command-blocks", f)?;
         display_arg_line(f, "format-tables", &self.format_tables.to_string())?;
+        display_arg_line(
+            f,
+            "split-after-begin",
+            &self.split_after_begin.to_string(),
+        )?;
         display_args_list(
             &self
                 .files
