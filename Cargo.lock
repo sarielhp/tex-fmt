@@ -583,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "tex-fmt"
-version = "0.5.7"
+version = "0.5.7+patched"
 dependencies = [
  "clap",
  "clap_complete",

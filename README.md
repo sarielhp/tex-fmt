@@ -40,10 +40,13 @@ and all followed by an independent code review.
   ([#72](https://github.com/WGUNDERWOOD/tex-fmt/issues/72),
   [#79](https://github.com/WGUNDERWOOD/tex-fmt/issues/79),
   [#133](https://github.com/WGUNDERWOOD/tex-fmt/issues/133)).
-- **Escaped braces `\{` and `\}` are soft**: they indent a multi-line set,
-  but an unmatched one is forgotten at the next blank line, and a stray
-  `\}` is ignored
-  ([#124](https://github.com/WGUNDERWOOD/tex-fmt/issues/124)).
+- **Escaped braces `\{` and `\}` follow `(`**: they are math delimiters
+  like `(` and `[`, so they indent exactly when `(` does, and are soft
+  exactly when `(` is
+  ([#124](https://github.com/WGUNDERWOOD/tex-fmt/issues/124)). With
+  `indent-delims = ["{"]` they do not indent at all; with `soft-delims =
+  ["(", "["]` an unmatched one is forgotten at the next blank line and a
+  stray `\}` is ignored.
 - **`\end{name}` resets the indentation** to that of the matching
   `\begin{name}`, so a delimiter left open inside an environment cannot
   shift lines after it.
@@ -53,8 +56,8 @@ and all followed by an independent code review.
 - **No overflow on deep nesting**: indent levels are 32-bit, so more than
   127 levels (generated TikZ, say) no longer wrap around or panic.
 - New option **`indent-delims`** chooses which delimiters indent at all;
-  `indent-delims = ["{"]` makes parentheses and brackets not indent, which
-  suits math, where half-open intervals such as `$(0,1]$` mix them.
+  `indent-delims = ["{"]` makes parentheses, brackets and escaped braces
+  not indent, which suits math, where half-open intervals such as `$(0,1]$` mix them.
   `(` and `[` must be chosen together for that reason.
 - New option **`soft-delims`** makes chosen delimiters soft, like `\{`:
   `soft-delims = ["(", "["]` indents a parenthesis continued onto the next
@@ -135,7 +138,9 @@ cargo install --git https://github.com/sarielhp/tex-fmt --branch patched
 ```
 
 or, from a clone, `tools/install`, which runs the tests, builds the
-release binary and installs it as `~/bin/tex-fmt`.
+release binary and installs it as `~/bin/tex-fmt`. The fork reports its
+version as the upstream version plus `+patched`, e.g. `tex-fmt
+0.5.7+patched`.
 
 An extremely fast LaTeX formatter written in Rust.
 Indentation, line wrapping and other formatting for LaTeX source code.
@@ -521,7 +526,7 @@ The first example in each row is the default value.
 | `verbatims`      | arr[str] | `[]`, `["myverbatim"]` | Extra verbatim environments |
 | `no-indent-envs` | arr[str] | `[]`, `["mydocument"]` | Environments which are not indented |
 | `wrap-chars`     | arr[str] | `[]`, `["。"]`         | Characters after which lines may be wrapped |
-| `indent-delims`  | arr[str] | `["{", "(", "["]`, `["{"]` | Delimiters which affect indentation; `(` and `[` go together |
-| `soft-delims`    | arr[str] | `[]`, `["(", "["]`   | Delimiters which are forgotten at a blank line |
+| `indent-delims`  | arr[str] | `["{", "(", "["]`, `["{"]` | Delimiters which affect indentation; `(` and `[` go together, and `\{` follows `(` |
+| `soft-delims`    | arr[str] | `[]`, `["(", "["]`   | Delimiters which are forgotten at a blank line; `\{` follows `(` |
 | `command-blocks` | arr[arr[str]] | `[]`, `[["If", "Else", "EndIf"]]` | Commands indenting their contents: opening, middle, closing (e.g. `algorithmic`) |
 | `verbosity`      | str      | `"warn"`, `"error"`    | Verbosity level for terminal logging |

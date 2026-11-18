@@ -196,8 +196,8 @@ enum Command {
 /// forgotten at a blank line. `\left` and `\right` always count as an
 /// opening and a closing delimiter, whichever delimiter follows them, and
 /// that delimiter is not counted again, so `\left\{ ... \right.` is
-/// balanced. The escaped braces `\{` and `\}` count as braces, but are
-/// always soft. At `\end{name}`, the delimiter state returns to the one
+/// balanced. The escaped braces `\{` and `\}` are counted, and are soft,
+/// exactly when `(` is, since they are math delimiters like `(` and `[`. At `\end{name}`, the delimiter state returns to the one
 /// at the matching `\begin{name}`, since an environment is a group.
 fn count_delims(
     line: &str,
@@ -209,11 +209,13 @@ fn count_delims(
     while let Some(c) = chars.next() {
         if c == '\\' {
             if let Some(b) = chars.next_if(|&n| n == '{' || n == '}') {
-                if args.indent_delims.contains(&'{') {
+                // Escaped braces follow the configuration of `(`
+                if args.indent_delims.contains(&'(') {
+                    let is_soft = args.soft_delims.contains(&'(');
                     if b == '{' {
-                        count.open(true);
+                        count.open(is_soft);
                     } else {
-                        count.close(true);
+                        count.close(is_soft);
                     }
                 }
             } else {
