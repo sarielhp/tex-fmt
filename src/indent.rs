@@ -284,6 +284,16 @@ fn read_command(chars: &mut Peekable<Chars>) -> Command {
                 Command::End(env)
             }
         }
+        "verb" => {
+            // \verb|...| or \verb*|...| with any delimiter: skip the
+            // contents, which are not LaTeX
+            chars.next_if_eq(&'*');
+            if let Some(delim) = chars.next() {
+                while chars.next_if(|&c| c != delim).is_some() {}
+                chars.next();
+            }
+            Command::Other
+        }
         _ => Command::Other,
     }
 }
