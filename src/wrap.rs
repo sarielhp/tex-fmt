@@ -90,17 +90,17 @@ fn find_wrap_point(
     let verb_end = get_verb_end(verb_start, line);
     let mut after_non_percent = verb_start == Some(0);
 
-    // Indentation alone can reach or exceed wrapmin under deep nesting
-    // (many nested environments, and/or a large --tabsize). When it does,
-    // there's no room left to look for a wrap point: `args.wrapmin -
-    // indent_length` would underflow, and even a saturated boundary of 0
-    // only produces a word-by-word shredding of the line with one warning
-    // per word. Give up cleanly instead - apply_wrap's existing "Line
-    // cannot be wrapped" warning already covers this, once per line.
-    if indent_length >= args.wrapmin {
+    // Indentation alone can reach or pass wrapmin under deep nesting (many
+    // nested environments and/or a large --tabsize). Between wrapmin and
+    // wraplen there is still room, so aim for wraplen there; past wraplen
+    // nothing fits, and apply_wrap reports the line once.
+    let wrap_boundary = if indent_length < args.wrapmin {
+        args.wrapmin - indent_length
+    } else if indent_length < args.wraplen {
+        args.wraplen - indent_length
+    } else {
         return None;
-    }
-    let wrap_boundary = args.wrapmin - indent_length;
+    };
     let line_len = line.len();
 
     for (i_char, (i_byte, c)) in line.char_indices().enumerate() {
@@ -155,8 +155,8 @@ pub fn apply_wrap<'a>(
     let comment_index = find_comment_index(line, pattern);
 
     match wrap_point {
-        Some(p) if p <= args.wraplen => {}
-        _ => {
+        Some(_) => {}
+        None => {
             record_line_log(
                 logs,
                 Level::Warn,
@@ -189,24 +189,23 @@ mod tests {
     use crate::args::Args;
     use crate::format::Pattern;
 
-    /// This is the exact repro that used to underflow `args.wrapmin -
-    /// indent_length` (panicking under overflow checks, or handing back a
-    /// garbage boundary otherwise): default wraplen/wrapmin, and an
-    /// indentation deep enough to reach past wrapmin on its own.
+    /// Indentation past wrapmin used to underflow `args.wrapmin -
+    /// indent_length`. Between wrapmin and wraplen the line is wrapped
+    /// within wraplen; at or past wraplen nothing fits.
     #[test]
-    fn gives_up_cleanly_when_indent_alone_exceeds_wrapmin() {
+    fn wraps_within_wraplen_when_indent_passes_wrapmin() {
         let args = Args::default();
-        assert_eq!(args.wrapmin, 70);
+        assert_eq!((args.wrapmin, args.wraplen), (70, 80));
         let line = "word ".repeat(10);
         let pattern = Pattern::new(&line);
 
-        // indent_length (72) > wrapmin (70): used to underflow.
-        let result = find_wrap_point(&line, 72, &args, &pattern);
-        assert_eq!(result, None);
-
-        // Exactly equal to wrapmin also has no room left.
-        let result = find_wrap_point(&line, 70, &args, &pattern);
-        assert_eq!(result, None);
+        for indent in [70, 72, 76] {
+            let p = find_wrap_point(&line, indent, &args, &pattern)
+                .expect("a wrap point within wraplen");
+            assert!(indent + p <= args.wraplen, "indent {indent}, point {p}");
+        }
+        assert_eq!(find_wrap_point(&line, 80, &args, &pattern), None);
+        assert_eq!(find_wrap_point(&line, 90, &args, &pattern), None);
     }
 
     /// Sanity check that normal (shallow-indent) wrapping is unaffected:
