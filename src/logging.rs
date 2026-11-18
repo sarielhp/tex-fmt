@@ -188,14 +188,14 @@ pub fn format_logs(logs: &mut Vec<Log>, args: &Args) -> String {
 ///
 /// # Panics
 ///
-/// This function panics if the file path does not exist
+/// Panics on a log of level `Debug`, which is never recorded.
 pub fn print_logs(logs: &mut Vec<Log>) {
     preprocess_logs(logs);
     for log in logs {
         let log_string = format!(
             "{} {}: {}",
             "tex-fmt".magenta().bold(),
-            log.file.to_str().unwrap().blue().bold(),
+            log.file.display().to_string().blue().bold(),
             format_log(log),
         );
 
