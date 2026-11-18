@@ -31,3 +31,55 @@ Recent commits use short, direct subjects such as `Fix table regex bug`; no mand
 ## Configuration Tips
 
 The repository's `tex-fmt.toml` applies automatically when running inside this checkout. Use `--noconfig` or `--config <PATH>` for controlled experiments.
+
+## This Fork (sarielhp/tex-fmt, branch `patched`)
+
+Everything above is upstream's guidance and applies here too. This
+section is specific to the fork; keep it at the end of the file so
+upstream changes to the sections above merge cleanly.
+
+- The fork carries fixes on top of upstream (see "Changes in this fork"
+  in README.md). Its changes are written with AI programming tools
+  (Claude Code), directed and reviewed by Sariel Har-Peled.
+- Build, test and install into `~/bin/tex-fmt` with `tools/install`.
+  The version string is the upstream version plus `+patched`.
+- Sync with upstream by fetching the `upstream` remote
+  (WGUNDERWOOD/tex-fmt) and rebasing or merging `patched` onto
+  `upstream/main`. Expect conflicts mainly in `src/indent.rs`,
+  `src/format.rs` and `src/wrap.rs`.
+- Branch each upstream contribution from `upstream/main` (upstream pull
+  requests target `main`), never from `patched`, keep it to one focused
+  change, and disclose in the pull request that it was written with
+  Claude Code. Post nothing upstream without the owner's go-ahead.
+
+### Upstream Contributions
+
+Check these periodically:
+`gh pr view <number> -R WGUNDERWOOD/tex-fmt --comments` and
+`gh pr checks <number> -R WGUNDERWOOD/tex-fmt`. Record every change of
+state (review comments, requested changes, CI results, merge or close)
+in the log below, newest last, with the date. When a contribution is
+merged, drop the fork's own version of the change at the next sync with
+upstream.
+
+| PR | Branch | Change | Opened | Status |
+|----|--------|--------|--------|--------|
+| [#163](https://github.com/WGUNDERWOOD/tex-fmt/pull/163) | `fix-left-right-pairing` | Pair `\left` with `\right` whatever their delimiters (fixes #72, #79, #133) | 2026-11-18 | Open |
+
+Log:
+
+- 2026-11-18 #163 opened against `main`, chosen as the most valuable
+  single fix: it resolves upstream's most-reported indentation bug. The
+  branch is upstream `main` plus one commit, a minimal version of the
+  fork's change (no soft delimiters, no reset at `\end`; `\{` counted as
+  before). It adds fixture `tests/left_right`, and `phd_dissertation`'s
+  target changes by indentation only. Mergeable; CI had not run yet,
+  awaiting the maintainer's approval of workflows for a first-time
+  contributor.
+
+Candidates for later pull requests, if #163 is well received (one each):
+`\verb` with any delimiter; table fixes (verbatim and `tex-fmt: off`
+regions, blank lines, `\&`; char alignment is already upstream #146);
+atomic writes; `--args` fail-on-change; the `(:?` regex typo. Review
+findings for open upstream pull requests #151, #153, #155 and #156 could
+be posted as comments there.
