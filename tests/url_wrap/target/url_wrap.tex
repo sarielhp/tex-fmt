@@ -1,0 +1,12 @@
+% Wrapping must not comment out text
+% after a % inside a URL or \verb
+A link
+\href[pdfnewwindow]{http://a/%20b}{x}
+and then more and more words after it
+\url|http://example.com/a%20b| and then
+more words after it so it wraps
+We get \verb|50%| of the cases and then
+many words follow here % real comment
+% here
+Type \verb|\url{| to start a link % and
+% this comment has many words in it
