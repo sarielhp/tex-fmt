@@ -4,7 +4,7 @@ use crate::args::Args;
 use crate::comments::find_comment_index;
 use crate::format::{Pattern, State};
 use crate::logging::{record_line_log, Log};
-use crate::regexes::VERBS;
+use crate::verbatim::verb_spans;
 use log::Level;
 use log::LevelFilter;
 use std::path::Path;
@@ -45,33 +45,6 @@ fn is_wrap_point(
         && (i_byte + 1 < line_len)
 }
 
-fn get_verb_end(verb_byte_start: Option<usize>, line: &str) -> Option<usize> {
-    verb_byte_start.map(|v| {
-        line[v..]
-            .match_indices(['|', '+'])
-            .nth(1)
-            .map(|(i, _)| i + v)
-    })?
-}
-
-fn is_inside_verb(
-    i_byte: usize,
-    contains_verb: bool,
-    verb_start: Option<usize>,
-    verb_end: Option<usize>,
-) -> bool {
-    if !contains_verb {
-        return false;
-    }
-    // For some verb-like commands (e.g. `\mintinline{...}{...}`) we cannot
-    // locate a `|` / `+` delimiter, so `verb_end` may be `None`. Treat that
-    // as "no protected region" rather than panicking.
-    match (verb_start, verb_end) {
-        (Some(start), Some(end)) => start <= i_byte && i_byte <= end,
-        _ => false,
-    }
-}
-
 /// Find the best place to break a long line.
 /// Provided as a *byte* index, not a *char* index.
 fn find_wrap_point(
@@ -82,13 +55,12 @@ fn find_wrap_point(
 ) -> Option<usize> {
     let mut wrap_point: Option<usize> = None;
     let mut prev_c: Option<char> = None;
-    let contains_verb =
-        pattern.contains_verb && VERBS.iter().any(|x| line.contains(x));
-    let verb_start: Option<usize> = contains_verb
-        .then(|| VERBS.iter().filter_map(|&x| line.find(x)).min().unwrap());
-
-    let verb_end = get_verb_end(verb_start, line);
-    let mut after_non_percent = verb_start == Some(0);
+    let verbs = if pattern.contains_verb {
+        verb_spans(line)
+    } else {
+        vec![]
+    };
+    let mut after_non_percent = verbs.first().is_some_and(|v| v.0 == 0);
 
     // Indentation alone can reach or pass wrapmin under deep nesting (many
     // nested environments and/or a large --tabsize). Between wrapmin and
@@ -108,8 +80,9 @@ fn find_wrap_point(
             break;
         }
         // Special wrapping for lines containing \verb|...|
-        let inside_verb =
-            is_inside_verb(i_byte, contains_verb, verb_start, verb_end);
+        let inside_verb = verbs
+            .iter()
+            .any(|&(start, end)| start <= i_byte && i_byte < end);
         if is_wrap_point(i_byte, c, prev_c, inside_verb, line_len, args) {
             if after_non_percent {
                 // Get index of the byte after which

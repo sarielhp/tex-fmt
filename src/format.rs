@@ -5,10 +5,10 @@ use crate::ignore::{get_ignore, Ignore};
 use crate::indent::{apply_indent, calculate_indent, EnvMark, Indent};
 use crate::logging::{record_file_log, Log};
 use crate::read::{read, read_stdin};
-use crate::regexes::{ENV_BEGIN, ENV_END, ITEM, RE_SPLITTING, VERBS};
+use crate::regexes::{ENV_BEGIN, ENV_END, ITEM, RE_SPLITTING};
 use crate::subs;
 use crate::table::{format_tables, is_inside_table, Table};
-use crate::verbatim::{get_verbatim, Verbatim};
+use crate::verbatim::{get_verbatim, verb_spans, Verbatim};
 use crate::wrap::{apply_wrap, needs_wrap};
 use crate::write::process_output;
 use crate::LINE_END;
@@ -288,7 +288,7 @@ pub struct Pattern {
     pub contains_splitting: bool,
     /// Whether a comment is present
     pub contains_comment: bool,
-    /// Whether a verb environment is present
+    /// Whether an inline verbatim command such as `\verb|...|` is present
     pub contains_verb: bool,
 }
 
@@ -297,7 +297,9 @@ impl Pattern {
     #[must_use]
     pub fn new(s: &str) -> Self {
         let contains_comment = s.contains('%');
-        let contains_verb = VERBS.iter().any(|x| s.contains(x));
+        let contains_verb = (s.contains("\\verb")
+            || s.contains("\\mintinline"))
+            && !verb_spans(s).is_empty();
         // If splitting does not match, most patterns are not present
         if RE_SPLITTING.is_match(s) {
             Self {

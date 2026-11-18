@@ -49,8 +49,7 @@ pub fn remove_trailing_blank_lines(text: &str) -> String {
 #[must_use]
 pub fn needs_split(line: &str, pattern: &Pattern) -> bool {
     // Don't split anything if the line contains a \verb|...|
-    if pattern.contains_verb && regexes::VERBS.iter().any(|x| line.contains(x))
-    {
+    if pattern.contains_verb {
         return false;
     }
 

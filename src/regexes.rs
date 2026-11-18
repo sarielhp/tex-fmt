@@ -16,9 +16,6 @@ pub const ENV_END: &str = "\\end{";
 /// Acceptable LaTeX file extensions
 pub const EXTENSIONS: [&str; 4] = ["tex", "bib", "sty", "cls"];
 
-/// Match a LaTeX \verb|...|
-pub const VERBS: [&str; 3] = ["\\verb|", "\\verb+", "\\mintinline"];
-
 /// Regex matches for sectioning commands
 const SPLITTING: [&str; 6] = [
     r"\\begin\{",
