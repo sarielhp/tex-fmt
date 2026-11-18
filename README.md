@@ -21,33 +21,121 @@ https://mit-license.org/)
 > 5.5), directed and reviewed by
 > [Sariel Har-Peled](https://github.com/sarielhp).
 > All credit for tex-fmt itself goes to its author and contributors.
->
-> Changes from upstream:
->
-> - `\left` and `\right` pair with each other whatever their delimiters,
->   so `\left\{ ... \right.` no longer shifts the rest of the file
->   ([#72](https://github.com/WGUNDERWOOD/tex-fmt/issues/72)).
-> - Escaped braces `\{` and `\}` are soft delimiters
->   ([#124](https://github.com/WGUNDERWOOD/tex-fmt/issues/124)).
-> - At `\end{name}`, delimiters left open since `\begin{name}` are closed,
->   so a stray delimiter cannot shift lines beyond its environment.
-> - Commands such as `\If ... \Else ... \EndIf` can indent their contents
->   ([#107](https://github.com/WGUNDERWOOD/tex-fmt/issues/107)).
-> - `%` inside a `\url` or `\href` URL is not a comment
->   ([#55](https://github.com/WGUNDERWOOD/tex-fmt/issues/55)).
-> - Fixes for crashes on deeply indented lines, unwritable files and
->   malformed configuration files, from open upstream pull requests
->   [#151](https://github.com/WGUNDERWOOD/tex-fmt/pull/151),
->   [#156](https://github.com/WGUNDERWOOD/tex-fmt/pull/156),
->   [#153](https://github.com/WGUNDERWOOD/tex-fmt/pull/153) and
->   [#155](https://github.com/WGUNDERWOOD/tex-fmt/pull/155).
-> - Fixes found in code review: files are written atomically, so a failed
->   write cannot cut a file short; `\verb` with any delimiter is never split
->   or wrapped; `--format-tables` leaves verbatim and `tex-fmt: off`
->   regions alone and aligns accented text; no overflow past 127 indent
->   levels; config errors name the file.
-> - New options `indent-delims`, `soft-delims` and `command-blocks` (see
->   [Configuration](#configuration)).
+> The fork lives on the `patched` branch; see
+> [Changes in this fork](#changes-in-this-fork) for what differs.
+
+## Changes in this fork
+
+Upstream tex-fmt indents by counting `{`, `(` and `[` on each line, so a
+single unmatched delimiter shifts every later line of the file. Most of
+the changes below make indentation robust against that in real papers;
+the rest are bug fixes, several taken from open upstream pull requests
+and all followed by an independent code review.
+
+### Indentation
+
+- **`\left` pairs with `\right`** whatever delimiters follow them, so
+  `\left\{ ... \right.` and `\left[ ... \right)` are balanced and no longer
+  shift the rest of the file
+  ([#72](https://github.com/WGUNDERWOOD/tex-fmt/issues/72),
+  [#79](https://github.com/WGUNDERWOOD/tex-fmt/issues/79),
+  [#133](https://github.com/WGUNDERWOOD/tex-fmt/issues/133)).
+- **Escaped braces `\{` and `\}` are soft**: they indent a multi-line set,
+  but an unmatched one is forgotten at the next blank line, and a stray
+  `\}` is ignored
+  ([#124](https://github.com/WGUNDERWOOD/tex-fmt/issues/124)).
+- **`\end{name}` resets the indentation** to that of the matching
+  `\begin{name}`, so a delimiter left open inside an environment cannot
+  shift lines after it.
+- **`\verb` contents are skipped** when counting delimiters and
+  environments, with any delimiter (`\verb|...|`, `\verb!...!`,
+  `\verb*...`).
+- **No overflow on deep nesting**: indent levels are 32-bit, so more than
+  127 levels (generated TikZ, say) no longer wrap around or panic.
+- New option **`indent-delims`** chooses which delimiters indent at all;
+  `indent-delims = ["{"]` makes parentheses and brackets not indent, which
+  suits math, where half-open intervals such as `$(0,1]$` mix them.
+  `(` and `[` must be chosen together for that reason.
+- New option **`soft-delims`** makes chosen delimiters soft, like `\{`:
+  `soft-delims = ["(", "["]` indents a parenthesis continued onto the next
+  line, but forgets it at a blank line.
+- New option **`command-blocks`** indents command-delimited blocks such as
+  those of `algorithmic`/`algpseudocode`
+  ([#107](https://github.com/WGUNDERWOOD/tex-fmt/issues/107)). Each block
+  lists its opening command, any middle commands, and its closing
+  command; names match exactly, with or without a backslash:
+
+  ```toml
+  command-blocks = [
+    ["If", "ElsIf", "Else", "EndIf"],
+    ["For", "EndFor"],
+    ["ForAll", "EndFor"],
+    ["While", "EndWhile"],
+    ["Repeat", "Until"],
+    ["Loop", "EndLoop"],
+    ["Procedure", "EndProcedure"],
+    ["Function", "EndFunction"],
+  ]
+  ```
+
+  The opening command indents the following lines, the closing command
+  ends that, and a middle command such as `\Else` is dedented on its own
+  line, like `\item`. A missing closing command is contained by the reset
+  at `\end{algorithmic}`.
+
+All three options default to upstream behaviour (`indent-delims = ["{",
+"(", "["]`, no soft delimiters, no command blocks), so an existing
+configuration formats as before apart from the fixes above.
+
+### Comments, splitting and wrapping
+
+- **`%` in URLs is not a comment**: inside the URL argument of `\url`,
+  `\href` (also with an optional argument), `\nolinkurl` and `\path`,
+  including the `\url|...|` form
+  ([#55](https://github.com/WGUNDERWOOD/tex-fmt/issues/55)). `\\%` (a line
+  break followed by a comment) is now recognized as a comment.
+- **`\verb` with any delimiter** is never split or wrapped across lines,
+  which LaTeX rejects; upstream knew only `\verb|` and `\verb+`, and only
+  the first `\verb` on a line.
+- **Wrapping under deep indentation**: a line indented past `wrapmin` is
+  wrapped within `wraplen` instead of underflowing (a panic) or being left
+  long ([#151](https://github.com/WGUNDERWOOD/tex-fmt/pull/151),
+  [#156](https://github.com/WGUNDERWOOD/tex-fmt/pull/156)).
+- No false "Line cannot be wrapped" warning on text with accented or Greek
+  letters.
+
+### Tables (`--format-tables`)
+
+- Tables inside verbatim environments and `% tex-fmt: off` regions are
+  left alone.
+- Columns are aligned by character, not byte, so accented text lines up;
+  an escaped `\&` no longer shifts the cells after it.
+- No blank line is added before a table on the first line or between
+  adjacent tables.
+
+### Robustness
+
+- **Files are written atomically**: the result goes to a temporary file
+  which then replaces the original, so a full disk or quota can no longer
+  leave a file cut short. A failed write is reported, with exit code 1,
+  instead of a panic ([#153](https://github.com/WGUNDERWOOD/tex-fmt/pull/153)).
+- **Malformed configuration files** are reported, naming the file and the
+  field, instead of a panic
+  ([#155](https://github.com/WGUNDERWOOD/tex-fmt/pull/155)); invalid
+  `command-blocks` are rejected.
+- No panics when standard output fails (`--print` into a full disk), on
+  file names that are not valid UTF-8, or on files without an extension;
+  a file that is not UTF-8 is reported with the reason.
+- `--args` shows the right value for `fail-on-change`.
+
+### Installing the fork
+
+```shell
+cargo install --git https://github.com/sarielhp/tex-fmt --branch patched
+```
+
+or, from a clone, `tools/install`, which runs the tests, builds the
+release binary and installs it as `~/bin/tex-fmt`.
 
 An extremely fast LaTeX formatter written in Rust.
 Indentation, line wrapping and other formatting for LaTeX source code.
