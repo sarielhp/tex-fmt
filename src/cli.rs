@@ -79,6 +79,8 @@ pub fn get_cli_args(matches: Option<ArgMatches>) -> OptionArgs {
         verbatims: vec![],
         no_indent_envs: vec![],
         wrap_chars: vec![],
+        indent_delims: None,
+        soft_delims: None,
         verbosity,
         arguments: get_flag(&arg_matches, "args"),
         files: arg_matches

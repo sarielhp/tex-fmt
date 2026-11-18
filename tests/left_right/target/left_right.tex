@@ -1,0 +1,35 @@
+\documentclass{article}
+
+\begin{document}
+
+% \left and \right pair whatever their delimiters
+\begin{equation*}
+  f(x) = \left\{
+    \begin{array}{ll}
+      1 & x > 0 \\
+      0 & \text{otherwise}
+    \end{array}
+  \right.
+\end{equation*}
+
+Inline $\left\{ x \right.$ and $\left. \frac{d}{dx} g \right|_{x=0}$.
+
+\begin{equation*}
+  \left|
+    \frac{a}{b}
+  \right|
+  + \left\langle u,
+  v \right\rangle
+\end{equation*}
+
+% Delimiter commands are not \left or \right
+$a \leftarrow b$ and $\rightarrow$ here.
+
+% Escaped braces are soft: a lone one only affects its paragraph
+A set $S = \{s_1,
+s_2\}$ and a lone \{ brace
+  in this paragraph.
+
+This paragraph is not indented.
+
+\end{document}

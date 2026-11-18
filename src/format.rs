@@ -2,7 +2,7 @@
 
 use crate::args::{Args, TabChar};
 use crate::ignore::{get_ignore, Ignore};
-use crate::indent::{apply_indent, calculate_indent, Indent};
+use crate::indent::{apply_indent, calculate_indent, EnvMark, Indent};
 use crate::logging::{record_file_log, Log};
 use crate::read::{read, read_stdin};
 use crate::regexes::{ENV_BEGIN, ENV_END, ITEM, RE_SPLITTING, VERBS};
@@ -246,6 +246,8 @@ pub struct State {
     pub linum_first_negative_indent: Option<usize>,
     /// Table status of the current line
     pub table: Table,
+    /// Environments begun but not yet ended, for delimiter counting
+    pub envs: Vec<EnvMark>,
 }
 
 impl State {
@@ -261,6 +263,7 @@ impl State {
             linum_last_zero_indent: 1,
             linum_first_negative_indent: None,
             table: Table::new(),
+            envs: Vec::new(),
         }
     }
 }

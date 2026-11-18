@@ -45,6 +45,10 @@ pub struct Args {
     pub no_indent_envs: Vec<String>,
     /// Characters after which lines can be wrapped
     pub wrap_chars: Vec<char>,
+    /// Opening delimiters whose pairs affect indentation
+    pub indent_delims: Vec<char>,
+    /// Delimiters whose indentation resets at a blank line
+    pub soft_delims: Vec<char>,
     /// Verbosity level for log messages
     pub verbosity: LevelFilter,
     /// Print arguments and exit
@@ -91,6 +95,10 @@ pub struct OptionArgs {
     pub no_indent_envs: Vec<String>,
     #[merge(strategy = merge_wrap_chars)]
     pub wrap_chars: Vec<char>,
+    #[merge(strategy= merge::option::overwrite_none)]
+    pub indent_delims: Option<Vec<char>>,
+    #[merge(strategy= merge::option::overwrite_none)]
+    pub soft_delims: Option<Vec<char>>,
     #[merge(strategy= merge::option::overwrite_none)]
     pub verbosity: Option<LevelFilter>,
     #[merge(strategy= merge::option::overwrite_none)]
@@ -164,6 +172,8 @@ impl Default for OptionArgs {
             verbatims,
             no_indent_envs,
             wrap_chars,
+            indent_delims: Some(vec!['{', '(', '[']),
+            soft_delims: Some(vec![]),
             verbosity: Some(LevelFilter::Warn),
             arguments: Some(false),
             files: vec![],
@@ -192,6 +202,8 @@ impl OptionArgs {
             verbatims: vec![],
             no_indent_envs: vec![],
             wrap_chars: vec![],
+            indent_delims: None,
+            soft_delims: None,
             verbosity: None,
             arguments: None,
             files: vec![],
@@ -255,6 +267,8 @@ impl Args {
             verbatims: args.verbatims,
             no_indent_envs: args.no_indent_envs,
             wrap_chars: args.wrap_chars,
+            indent_delims: args.indent_delims.unwrap(),
+            soft_delims: args.soft_delims.unwrap(),
             verbosity: args.verbosity.unwrap(),
             arguments: args.arguments.unwrap(),
             files: args.files,
@@ -328,6 +342,40 @@ impl Args {
             exit_code = 1;
         }
 
+        // Only braces, parentheses and brackets can be indentation delimiters
+        for c in self.indent_delims.iter().chain(&self.soft_delims) {
+            if !['{', '(', '['].contains(c) {
+                record_file_log(
+                    logs,
+                    Level::Error,
+                    &empty_path,
+                    &format!(
+                        "Invalid delimiter {c:?} in indent-delims or soft-delims; use \"{{\", \"(\" or \"[\"."
+                    ),
+                );
+                exit_code = 1;
+            }
+        }
+
+        // Half-open intervals such as (a,b] pair a parenthesis with a
+        // bracket, so these two are counted together or not at all
+        for (name, delims) in [
+            ("indent-delims", &self.indent_delims),
+            ("soft-delims", &self.soft_delims),
+        ] {
+            if delims.contains(&'(') != delims.contains(&'[') {
+                record_file_log(
+                    logs,
+                    Level::Error,
+                    &empty_path,
+                    &format!(
+                        "{name} must contain both \"(\" and \"[\" or neither, since half-open intervals such as (a,b] mix them."
+                    ),
+                );
+                exit_code = 1;
+            }
+        }
+
         // Remove duplicate environments and files
         self.lists.dedup();
         self.verbatims.dedup();
@@ -385,6 +433,9 @@ fn display_args_list(
 
 impl fmt::Display for Args {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let char_list = |v: &[char]| -> Vec<String> {
+            v.iter().map(std::string::ToString::to_string).collect()
+        };
         let wrap_chars: Vec<String> = self
             .wrap_chars
             .iter()
@@ -413,6 +464,8 @@ impl fmt::Display for Args {
         display_args_list(&self.verbatims, "verbatims", f)?;
         display_args_list(&self.no_indent_envs, "no-indent-envs", f)?;
         display_args_list(&wrap_chars, "wrap-chars", f)?;
+        display_args_list(&char_list(&self.indent_delims), "indent-delims", f)?;
+        display_args_list(&char_list(&self.soft_delims), "soft-delims", f)?;
         display_arg_line(f, "format-tables", &self.format_tables.to_string())?;
         display_args_list(
             &self

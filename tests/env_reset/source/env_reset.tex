@@ -1,0 +1,33 @@
+\documentclass{article}
+
+\begin{document}
+
+% Delimiters left open inside an environment are closed by its \end
+\begin{itemize}
+\item An unclosed (parenthetical
+remark inside a list.
+\item Next item.
+\end{itemize}
+Text after the list.
+
+\begin{lemma}
+An interval $[0,1)$ and
+\begin{equation}
+x = (a
++ b
+\end{equation}
+still inside the lemma.
+\end{lemma}
+Text after the lemma.
+
+% Delimiters opened before an environment are kept
+\begin{equation*}
+f = \left\{
+\begin{array}{ll}
+1 & x > 0
+\end{array}
+\right.
+\end{equation*}
+Text after the equation.
+
+\end{document}

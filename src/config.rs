@@ -139,6 +139,17 @@ pub fn get_config_args(
         .map(|c| string_to_char(c))
         .collect();
 
+    // Read delimiter lists to Vec<char>; absent means the default
+    let char_array = |name: &str| -> Option<Vec<char>> {
+        config.get(name)?;
+        Some(
+            parse_array_string(name, &config)
+                .iter()
+                .map(|c| string_to_char(c))
+                .collect(),
+        )
+    };
+
     let args = OptionArgs {
         check: config.get("check").map(|x| x.as_bool().unwrap()),
         print: config.get("print").map(|x| x.as_bool().unwrap()),
@@ -163,6 +174,8 @@ pub fn get_config_args(
         verbatims: parse_array_string("verbatims", &config),
         no_indent_envs: parse_array_string("no-indent-envs", &config),
         wrap_chars,
+        indent_delims: char_array("indent-delims"),
+        soft_delims: char_array("soft-delims"),
         verbosity,
         arguments: None,
         files: vec![],

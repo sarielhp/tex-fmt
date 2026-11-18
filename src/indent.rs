@@ -8,12 +8,12 @@ use crate::regexes::{ENV_BEGIN, ENV_END, ITEM, VERBS};
 use core::cmp::max;
 use log::Level;
 use log::LevelFilter;
+use std::iter::Peekable;
 use std::path::Path;
+use std::str::Chars;
 
-/// Opening delimiters
-const OPENS: [char; 3] = ['{', '(', '['];
-/// Closing delimiters
-const CLOSES: [char; 3] = ['}', ')', ']'];
+/// Delimiter pairs which may affect indentation, as (opening, closing)
+const DELIMS: [(char, char); 3] = [('{', '}'), ('(', ')'), ('[', ']')];
 
 /// Information on the indentation state of a line
 #[derive(Debug, Clone)]
@@ -22,6 +22,10 @@ pub struct Indent {
     pub actual: i8,
     /// The visual indentation level of a line
     pub visual: i8,
+    /// The number of soft delimiters left open in the current paragraph
+    pub soft: i8,
+    /// The number of delimiters left open overall
+    pub depth: i8,
 }
 
 impl Indent {
@@ -31,6 +35,8 @@ impl Indent {
         Self {
             actual: 0,
             visual: 0,
+            soft: 0,
+            depth: 0,
         }
     }
 }
@@ -115,16 +121,184 @@ fn get_back(
     back
 }
 
-/// Calculate delimiter-based indent and dedent together for performance
-fn get_diff_back_delim(line: &str) -> (i8, i8) {
-    let mut diff: i8 = 0;
-    let mut back: i8 = 0;
-    for c in line.chars() {
-        diff -= i8::from(OPENS.contains(&c));
-        diff += i8::from(CLOSES.contains(&c));
-        back = max(diff, back);
+/// Delimiter depth and soft delimiter count recorded at a `\begin{...}`
+#[derive(Debug, Clone)]
+pub struct EnvMark {
+    /// Name of the environment
+    name: String,
+    /// Delimiter depth at the `\begin`
+    depth: i8,
+    /// Number of open soft delimiters at the `\begin`
+    soft: i8,
+}
+
+/// Running delimiter count for one line
+struct DelimCount {
+    /// Change in indentation, negative for indenting
+    diff: i8,
+    /// Largest dedent reached on the line
+    back: i8,
+    /// Number of soft delimiters open in the current paragraph
+    soft: i8,
+    /// Number of delimiters open overall
+    depth: i8,
+}
+
+impl DelimCount {
+    fn open(&mut self, is_soft: bool) {
+        self.soft += i8::from(is_soft);
+        self.depth += 1;
+        self.diff -= 1;
     }
-    (-diff, back)
+
+    /// A soft closing delimiter without an open partner is ignored
+    fn close(&mut self, is_soft: bool) {
+        if !is_soft || self.soft > 0 {
+            self.soft -= i8::from(is_soft);
+            self.depth -= 1;
+            self.diff += 1;
+        }
+    }
+
+    /// Return to the delimiter state recorded at a `\begin`
+    fn reset(&mut self, mark: &EnvMark) {
+        self.diff += self.depth - mark.depth;
+        self.depth = mark.depth;
+        self.soft = mark.soft;
+    }
+}
+
+/// A command which affects delimiter counting
+enum Command {
+    Left,
+    Right,
+    Begin(String),
+    End(String),
+    Other,
+}
+
+/// Count the delimiters on a line, in order
+///
+/// Only delimiter pairs whose opening character is in `args.indent_delims`
+/// are counted. Those in `args.soft_delims` are soft: a soft closing
+/// delimiter without an open partner is ignored, and open ones are
+/// forgotten at a blank line. `\left` and `\right` always count as an
+/// opening and a closing delimiter, whichever delimiter follows them, and
+/// that delimiter is not counted again, so `\left\{ ... \right.` is
+/// balanced. The escaped braces `\{` and `\}` count as braces, but are
+/// always soft. At `\end{name}`, the delimiter state returns to the one
+/// at the matching `\begin{name}`, since an environment is a group.
+fn count_delims(
+    line: &str,
+    args: &Args,
+    count: &mut DelimCount,
+    envs: &mut Vec<EnvMark>,
+) {
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            if let Some(b) = chars.next_if(|&n| n == '{' || n == '}') {
+                if args.indent_delims.contains(&'{') {
+                    if b == '{' {
+                        count.open(true);
+                    } else {
+                        count.close(true);
+                    }
+                }
+            } else {
+                match read_command(&mut chars) {
+                    Command::Left => count.open(false),
+                    Command::Right => count.close(false),
+                    Command::Begin(name) => envs.push(EnvMark {
+                        name,
+                        depth: count.depth,
+                        soft: count.soft,
+                    }),
+                    Command::End(name) => {
+                        if let Some(i) =
+                            envs.iter().rposition(|m| m.name == name)
+                        {
+                            count.reset(&envs[i]);
+                            envs.truncate(i);
+                        }
+                    }
+                    Command::Other => {}
+                }
+            }
+        } else if let Some(&(open, _)) = DELIMS.iter().find(|&&(o, e)| {
+            (o == c || e == c) && args.indent_delims.contains(&o)
+        }) {
+            let is_soft = args.soft_delims.contains(&open);
+            if c == open {
+                count.open(is_soft);
+            } else {
+                count.close(is_soft);
+            }
+        }
+        count.back = max(count.diff, count.back);
+    }
+}
+
+/// Read the command or escaped character following a backslash
+///
+/// The delimiter after `\left` or `\right` and the name after `\begin` or
+/// `\end` are read as well.
+fn read_command(chars: &mut Peekable<Chars>) -> Command {
+    let Some(&first) = chars.peek() else {
+        return Command::Other;
+    };
+    if !first.is_ascii_alphabetic() {
+        // An escaped character, such as \\ or \%, is skipped, but the math
+        // delimiters \( \) \[ \] still count as their bracket
+        if !"()[]".contains(first) {
+            chars.next();
+        }
+        return Command::Other;
+    }
+    let mut name = String::new();
+    while let Some(c) = chars.next_if(char::is_ascii_alphabetic) {
+        name.push(c);
+    }
+    match name.as_str() {
+        "left" | "right" => {
+            skip_delimiter(chars);
+            if name == "left" {
+                Command::Left
+            } else {
+                Command::Right
+            }
+        }
+        "begin" | "end" => {
+            while chars.next_if(|c| c.is_whitespace()).is_some() {}
+            if chars.next_if_eq(&'{').is_none() {
+                return Command::Other;
+            }
+            let mut env = String::new();
+            while let Some(c) = chars.next_if(|&c| c != '}') {
+                env.push(c);
+            }
+            chars.next();
+            if name == "begin" {
+                Command::Begin(env)
+            } else {
+                Command::End(env)
+            }
+        }
+        _ => Command::Other,
+    }
+}
+
+/// Skip the delimiter after `\left` or `\right`: a control word such as
+/// `\langle`, a control symbol such as `\{`, or a character such as `(`
+fn skip_delimiter(chars: &mut Peekable<Chars>) {
+    while chars.next_if(|c| c.is_whitespace()).is_some() {}
+    if chars.next() == Some('\\') {
+        if chars.next_if(char::is_ascii_alphabetic).is_some() {
+            while chars.next_if(char::is_ascii_alphabetic).is_some() {}
+        } else {
+            chars.next();
+        }
+    }
 }
 
 /// Calculate indentation properties of the current line
@@ -134,11 +308,26 @@ fn get_indent(
     prev_indent: &Indent,
     pattern: &Pattern,
     state: &State,
+    args: &Args,
+    envs: &mut Vec<EnvMark>,
     lists_begin: &[String],
     lists_end: &[String],
     no_indent_envs_begin: &[String],
     no_indent_envs_end: &[String],
 ) -> Indent {
+    let mut actual = prev_indent.actual;
+    let mut count = DelimCount {
+        diff: 0,
+        back: 0,
+        soft: prev_indent.soft,
+        depth: prev_indent.depth,
+    };
+    // Soft delimiters left open do not carry past a blank line
+    if line.trim().is_empty() {
+        actual -= count.soft;
+        count.depth -= count.soft;
+        count.soft = 0;
+    }
     let mut diff = get_diff(
         line,
         pattern,
@@ -149,12 +338,17 @@ fn get_indent(
     );
     let mut back =
         get_back(line, pattern, state, lists_end, no_indent_envs_end);
-    let diff_back_delim = get_diff_back_delim(line);
-    diff += diff_back_delim.0;
-    back += diff_back_delim.1;
-    let actual = prev_indent.actual + diff;
-    let visual = prev_indent.actual - back;
-    Indent { actual, visual }
+    count_delims(line, args, &mut count, envs);
+    diff -= count.diff;
+    back += count.back;
+    let visual = actual - back;
+    actual += diff;
+    Indent {
+        actual,
+        visual,
+        soft: count.soft,
+        depth: count.depth,
+    }
 }
 
 /// Calculates the indent for `line` based on its contents.
@@ -178,16 +372,20 @@ pub fn calculate_indent(
     // (if there is one) to ignore diffs from characters in there.
     let comment_index = find_comment_index(line, pattern);
     let line_strip = remove_comment(line, comment_index);
+    let mut envs = std::mem::take(&mut state.envs);
     let mut indent = get_indent(
         line_strip,
         &state.indent,
         pattern,
         state,
+        args,
+        &mut envs,
         lists_begin,
         lists_end,
         no_indent_envs_begin,
         no_indent_envs_end,
     );
+    state.envs = envs;
 
     // Record the indent to the logs.
     if args.verbosity == LevelFilter::Trace {
